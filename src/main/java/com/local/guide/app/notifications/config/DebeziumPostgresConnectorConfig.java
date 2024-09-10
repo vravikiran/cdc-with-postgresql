@@ -49,6 +49,8 @@ public class DebeziumPostgresConnectorConfig {
         configMap.put("key.converter.schemas.enable", "false");
         configMap.put("transforms", "unwrap");
         configMap.put("transforms.unwrap.type", "io.debezium.transforms.ExtractNewRecordState");
+        configMap.put("transforms.unwrap.add.fields","table,op");
+        configMap.put("time.precision.mode", "connect");
 		return io.debezium.config.Configuration.from(configMap);
 	}
 }
