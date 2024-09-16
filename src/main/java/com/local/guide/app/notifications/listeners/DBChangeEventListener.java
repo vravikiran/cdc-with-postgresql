@@ -10,7 +10,10 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+
+import com.local.guide.app.notifications.services.RequestProducerService;
 
 import io.debezium.config.Configuration;
 import io.debezium.embedded.Connect;
@@ -21,11 +24,13 @@ import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 
 @Component
-public class EmployeeEventListener {
+public class DBChangeEventListener {
 	private final Executor excutor;
 	private final DebeziumEngine<RecordChangeEvent<SourceRecord>> debeziumEngine;
+	@Autowired
+	RequestProducerService requestProducerService;
 
-	public EmployeeEventListener(Configuration postgresConnector) {
+	public DBChangeEventListener(Configuration postgresConnector) {
 		this.excutor = Executors.newSingleThreadExecutor();
 		this.debeziumEngine = DebeziumEngine.create(ChangeEventFormat.of(Connect.class))
 				.using(postgresConnector.asProperties()).notifying(this::handleChangeEvent).build();
@@ -43,12 +48,17 @@ public class EmployeeEventListener {
 				.filter(fieldName -> sourceRecordChangeValue.get(fieldName) != null)
 				.map(fieldName -> Pair.of(fieldName, sourceRecordChangeValue.get(fieldName)))
 				.collect(Collectors.toMap(Pair::getKey, Pair::getValue));
-		String op = (String) payload.get("__op");
 		String tableName = (String) payload.get("__table");
 		payload.remove("__op");
 		payload.remove("__table");
-		System.out.println("payload:: " + payload);
-		System.out.println(op+"::"+tableName);
+		publishRecordChange(tableName, payload);
+	}
+	
+	private void publishRecordChange(String tableName,Map<String,Object> payLoad) {
+		switch(tableName.toUpperCase()) {
+		case "REQUEST":
+			requestProducerService.publishRequestUpdates(payLoad);
+		}
 	}
 
 	@PreDestroy
